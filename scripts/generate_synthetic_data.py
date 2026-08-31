@@ -223,42 +223,33 @@ def write_sql_script(
     billing_ds: str,
     obs_ds: str,
     billing_account_id: str,
-    mode: str = "all"
-):
-    """Writes formatted SQL insert script."""
+    mode: str = "all",
+    max_chunk_size: int = 750_000
+) -> List[str]:
+    """Writes formatted SQL insert script, splitting into parts if exceeding BigQuery query size limits."""
+    import os
     billing_table_name = format_billing_table_name(billing_account_id)
-    print(f"Writing SQL script to {output_file} (Mode: {mode})...")
+    statements = []
 
-    with open(output_file, "w") as f:
-        f.write("-- ============================================================================\n")
-        f.write(f"-- Synthetic Data Script for GCS Observability & Billing Showback\n")
-        f.write(f"-- Mode: {mode}\n")
-        f.write(f"-- Target Billing Table: {project_id}.{billing_ds}.{billing_table_name}\n")
-        f.write(f"-- Target Telemetry Table: {project_id}.{obs_ds}.client_io_aggregated_events\n")
-        f.write("-- ============================================================================\n\n")
+    # 1. Telemetry Data
+    if mode in ("all", "telemetry-only"):
+        batch_size = 50
+        for i in range(0, len(telemetry_rows), batch_size):
+            batch = telemetry_rows[i:i+batch_size]
+            val_strings = [
+                f"('{r['application_id']}', '{r['engine']}', '{r['ugi']}', '{r['parent_directory']}', '{r['operation_type']}', {r['bytes_transferred']}, {r['operation_count']}, '{r['source_zone']}', '{r['destination_bucket']}', TIMESTAMP('{r['event_timestamp']}'))"
+                for r in batch
+            ]
+            stmt = (
+                f"INSERT INTO `{project_id}.{obs_ds}.client_io_aggregated_events` "
+                f"(application_id, engine, ugi, parent_directory, operation_type, bytes_transferred, operation_count, source_zone, destination_bucket, event_timestamp)\n"
+                f"VALUES\n" + ",\n".join(val_strings) + ";"
+            )
+            statements.append(stmt)
 
-        # 1. Telemetry Data
-        if mode in ("all", "telemetry-only"):
-            f.write("-- ----------------------------------------------------------------------------\n")
-            f.write("-- 1. Client-Side GCS I/O Telemetry Events\n")
-            f.write("-- ----------------------------------------------------------------------------\n")
-            batch_size = 50
-            for i in range(0, len(telemetry_rows), batch_size):
-                batch = telemetry_rows[i:i+batch_size]
-                f.write(f"INSERT INTO `{project_id}.{obs_ds}.client_io_aggregated_events` ")
-                f.write("(application_id, engine, ugi, parent_directory, operation_type, bytes_transferred, operation_count, source_zone, destination_bucket, event_timestamp)\nVALUES\n")
-                val_strings = []
-                for r in batch:
-                    val_strings.append(f"('{r['application_id']}', '{r['engine']}', '{r['ugi']}', '{r['parent_directory']}', '{r['operation_type']}', {r['bytes_transferred']}, {r['operation_count']}, '{r['source_zone']}', '{r['destination_bucket']}', TIMESTAMP('{r['event_timestamp']}'))")
-                f.write(",\n".join(val_strings) + ";\n\n")
-
-        # 2. Mock Billing Export Table DDL & Data (Sandbox / Simulation Mode)
-        if mode in ("all", "billing-only"):
-            f.write("-- ----------------------------------------------------------------------------\n")
-            f.write("-- 2. Mock Google Cloud Detailed Billing Export Table (Sandbox Mode)\n")
-            f.write("-- Note: In production with live GCP export, Google Cloud Billing creates & maintains this table.\n")
-            f.write("-- ----------------------------------------------------------------------------\n")
-            f.write(f"""CREATE TABLE IF NOT EXISTS `{project_id}.{billing_ds}.{billing_table_name}` (
+    # 2. Mock Billing Export Table DDL & Data (Sandbox / Simulation Mode)
+    if mode in ("all", "billing-only"):
+        ddl = f"""CREATE TABLE IF NOT EXISTS `{project_id}.{billing_ds}.{billing_table_name}` (
   billing_account_id STRING,
   service STRUCT<id STRING, description STRING>,
   sku STRUCT<id STRING, description STRING>,
@@ -280,38 +271,96 @@ def write_sql_script(
   resource STRUCT<name STRING, global_name STRING, id STRING>,
   tags ARRAY<STRUCT<key STRING, value STRING, inherited BOOL, namespace STRING>>
 )
-PARTITION BY DATE(usage_start_time)
-CLUSTER BY resource.name, sku.description;
+PARTITION BY DATE(usage_start_time);"""
+        statements.append(ddl)
 
-""")
+        batch_size = 50
+        for i in range(0, len(billing_rows), batch_size):
+            batch = billing_rows[i:i+batch_size]
+            val_strings = []
+            for r in batch:
+                val_strings.append(
+                    f"('{r['billing_account_id']}', "
+                    f"STRUCT('{r['service']['id']}', '{r['service']['description']}'), "
+                    f"STRUCT('{r['sku']['id']}', '{r['sku']['description']}'), "
+                    f"TIMESTAMP('{r['usage_start_time']}'), TIMESTAMP('{r['usage_end_time']}'), "
+                    f"STRUCT('{r['project']['id']}', '{r['project']['number']}', '{r['project']['name']}', ARRAY<STRUCT<key STRING, value STRING>>[]), "
+                    f"ARRAY<STRUCT<key STRING, value STRING>>[], ARRAY<STRUCT<key STRING, value STRING>>[], "
+                    f"STRUCT('{r['location']['location']}', '{r['location']['country']}', '{r['location']['region']}', '{r['location']['zone']}'), "
+                    f"TIMESTAMP('{r['export_time']}'), {r['cost']}, '{r['currency']}', {r['currency_conversion_rate']}, "
+                    f"STRUCT({r['usage']['amount']}, '{r['usage']['unit']}', {r['usage']['amount_in_pricing_units']}, '{r['usage']['pricing_unit']}'), "
+                    f"ARRAY<STRUCT<name STRING, amount FLOAT64, full_name STRING, id STRING, type STRING>>[], "
+                    f"STRUCT('{r['invoice']['month']}'), '{r['cost_type']}', {r['cost_at_list']}, "
+                    f"STRUCT('{r['resource']['name']}', '{r['resource']['global_name']}', '{r['resource']['id']}'), "
+                    f"ARRAY<STRUCT<key STRING, value STRING, inherited BOOL, namespace STRING>>[])"
+                )
+            stmt = (
+                f"INSERT INTO `{project_id}.{billing_ds}.{billing_table_name}` "
+                f"(billing_account_id, service, sku, usage_start_time, usage_end_time, project, labels, system_labels, location, export_time, cost, currency, currency_conversion_rate, usage, credits, invoice, cost_type, cost_at_list, resource, tags)\n"
+                f"VALUES\n" + ",\n".join(val_strings) + ";"
+            )
+            statements.append(stmt)
 
-            batch_size = 50
-            for i in range(0, len(billing_rows), batch_size):
-                batch = billing_rows[i:i+batch_size]
-                f.write(f"INSERT INTO `{project_id}.{billing_ds}.{billing_table_name}` ")
-                f.write("(billing_account_id, service, sku, usage_start_time, usage_end_time, project, labels, system_labels, location, export_time, cost, currency, currency_conversion_rate, usage, credits, invoice, cost_type, cost_at_list, resource, tags)\nVALUES\n")
-                val_strings = []
-                for r in batch:
-                    val_strings.append(
-                        f"('{r['billing_account_id']}', "
-                        f"STRUCT('{r['service']['id']}', '{r['service']['description']}'), "
-                        f"STRUCT('{r['sku']['id']}', '{r['sku']['description']}'), "
-                        f"TIMESTAMP('{r['usage_start_time']}'), TIMESTAMP('{r['usage_end_time']}'), "
-                        f"STRUCT('{r['project']['id']}', '{r['project']['number']}', '{r['project']['name']}', ARRAY<STRUCT<key STRING, value STRING>>[]), "
-                        f"ARRAY<STRUCT<key STRING, value STRING>>[], ARRAY<STRUCT<key STRING, value STRING>>[], "
-                        f"STRUCT('{r['location']['location']}', '{r['location']['country']}', '{r['location']['region']}', '{r['location']['zone']}'), "
-                        f"TIMESTAMP('{r['export_time']}'), {r['cost']}, '{r['currency']}', {r['currency_conversion_rate']}, "
-                        f"STRUCT({r['usage']['amount']}, '{r['usage']['unit']}', {r['usage']['amount_in_pricing_units']}, '{r['usage']['pricing_unit']}'), "
-                        f"ARRAY<STRUCT<name STRING, amount FLOAT64, full_name STRING, id STRING, type STRING>>[], "
-                        f"STRUCT('{r['invoice']['month']}'), '{r['cost_type']}', {r['cost_at_list']}, "
-                        f"STRUCT('{r['resource']['name']}', '{r['resource']['global_name']}', '{r['resource']['id']}'), "
-                        f"ARRAY<STRUCT<key STRING, value STRING, inherited BOOL, namespace STRING>>[])"
-                    )
-                f.write(",\n".join(val_strings) + ";\n\n")
+    # Partition statements into chunks that comply with BigQuery query size limit
+    chunks = []
+    current_chunk = []
+    current_len = 0
+    for stmt in statements:
+        stmt_len = len(stmt) + 2
+        if current_chunk and (current_len + stmt_len > max_chunk_size):
+            chunks.append("\n\n".join(current_chunk) + "\n")
+            current_chunk = [stmt]
+            current_len = stmt_len
+        else:
+            current_chunk.append(stmt)
+            current_len += stmt_len
+    if current_chunk:
+        chunks.append("\n\n".join(current_chunk) + "\n")
 
-    print(f"Successfully generated {output_file}!")
+    base, ext = os.path.splitext(output_file)
+    # Clean up any existing split parts or old oversized output
+    import glob
+    for old_part in glob.glob(f"{base}_part*{ext}"):
+        try:
+            os.remove(old_part)
+        except OSError:
+            pass
+
+    generated_files = []
+    if len(chunks) == 1:
+        with open(output_file, "w") as f:
+            f.write(
+                f"-- ============================================================================\n"
+                f"-- Synthetic Data Script for GCS Observability & Billing Showback\n"
+                f"-- Mode: {mode} | Target Project: {project_id}\n"
+                f"-- ============================================================================\n\n"
+            )
+            f.write(chunks[0])
+        generated_files.append(output_file)
+    else:
+        if os.path.exists(output_file):
+            try:
+                os.remove(output_file)
+            except OSError:
+                pass
+        for idx, chunk_sql in enumerate(chunks, start=1):
+            part_path = f"{base}_part{idx}{ext}"
+            with open(part_path, "w") as f:
+                f.write(
+                    f"-- ============================================================================\n"
+                    f"-- Synthetic Data Script for GCS Observability & Billing Showback (Part {idx} of {len(chunks)})\n"
+                    f"-- Mode: {mode} | Target Project: {project_id}\n"
+                    f"-- Query Size: {len(chunk_sql)/1024:.1f} KB (BigQuery limit: 1024 KB)\n"
+                    f"-- ============================================================================\n\n"
+                )
+                f.write(chunk_sql)
+            generated_files.append(part_path)
+
+    return generated_files
+
 
 def main():
+    import subprocess
     parser = argparse.ArgumentParser(description="Generate synthetic GCP GCS billing and telemetry data.")
     parser.add_argument("--days", type=int, default=14, help="Number of days of data to generate (default: 14)")
     parser.add_argument("--project-id", type=str, default="my-gcp-project-id", help="Target GCP Project ID")
@@ -320,7 +369,9 @@ def main():
     parser.add_argument("--obs-dataset", type=str, default="billing_observability_dataset", help="Observability dataset ID")
     parser.add_argument("--mode", choices=["all", "telemetry-only", "billing-only"], default="all", help="Data generation mode: 'telemetry-only' (for live GCP billing export), 'all' (sandbox), 'billing-only'")
     parser.add_argument("--output-sql", type=str, default="scripts/synthetic_data_inserts.sql", help="File path to save output SQL script")
-    parser.add_argument("--load-bq", action="store_true", help="Directly load data into BigQuery using python client")
+    parser.add_argument("--max-chunk-kb", type=int, default=750, help="Maximum size per SQL part file in KB (default: 750, limit: 1024)")
+    parser.add_argument("--execute-bq", action="store_true", help="Directly execute generated SQL files using the 'bq' CLI")
+    parser.add_argument("--load-bq", action="store_true", help="Directly load data into BigQuery using python client (requires google-cloud-bigquery)")
 
     args = parser.parse_args()
 
@@ -330,7 +381,7 @@ def main():
         billing_account_id=args.billing_account_id
     )
 
-    write_sql_script(
+    generated_files = write_sql_script(
         telemetry_rows=telemetry_rows,
         billing_rows=billing_rows,
         output_file=args.output_sql,
@@ -338,8 +389,36 @@ def main():
         billing_ds=args.billing_dataset,
         obs_ds=args.obs_dataset,
         billing_account_id=args.billing_account_id,
-        mode=args.mode
+        mode=args.mode,
+        max_chunk_size=args.max_chunk_kb * 1024
     )
+
+    if len(generated_files) == 1:
+        print(f"Successfully generated {generated_files[0]}!")
+    else:
+        print(f"Successfully generated {len(generated_files)} SQL files (split to fit under BigQuery's 1024 KB limit):")
+        for fpath in generated_files:
+            print(f"  • {fpath}")
+
+    if args.execute_bq:
+        print(f"\nExecuting {len(generated_files)} file(s) in BigQuery via 'bq' CLI...")
+        for fpath in generated_files:
+            print(f"  ▶ Executing {fpath}...")
+            with open(fpath, "r") as f_in:
+                cmd = ["bq", "query", "--use_legacy_sql=false", "--label", "datacloud:ai-agent"]
+                res = subprocess.run(cmd, stdin=f_in)
+                if res.returncode != 0:
+                    print(f"❌ Execution failed for {fpath}")
+                    sys.exit(res.returncode)
+        print("🎉 All synthetic data files loaded into BigQuery successfully!")
+    else:
+        print("\nNext step to load data into BigQuery:")
+        if len(generated_files) > 1:
+            print("  Run helper script: ./scripts/load_synthetic_data.sh")
+            print("  Or run manually:")
+            print("    for f in scripts/synthetic_data_inserts_part*.sql; do bq query --use_legacy_sql=false --label datacloud:ai-agent < \"$f\"; done")
+        else:
+            print(f"  bq query --use_legacy_sql=false --label datacloud:ai-agent < {generated_files[0]}")
 
     if args.load_bq:
         try:
@@ -364,7 +443,7 @@ def main():
                 else:
                     print(f"Successfully inserted {len(billing_rows)} billing rows into {billing_table_ref}")
         except Exception as e:
-            print(f"Could not insert directly into BigQuery: {e}. You can execute {args.output_sql} directly in BigQuery.")
+            print(f"Could not insert directly into BigQuery Python SDK: {e}")
 
 if __name__ == "__main__":
     main()

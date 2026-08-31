@@ -35,8 +35,8 @@ bq-cloudlake-attribution/
 │           └── outputs.tf
 ├── scripts/                        # Automation & Synthetic Generator
 │   ├── setup_billing_export.sh     # CLI automation to verify/setup GCP Billing Export & BigQuery dataset
-│   ├── generate_synthetic_data.py  # Dual-mode synthetic data generator
-│   ├── synthetic_data_inserts.sql  # Generated SQL inserts for sandbox/offline use
+│   ├── generate_synthetic_data.py  # Dual-mode synthetic data generator (auto-splits SQL under 1MB)
+│   ├── load_synthetic_data.sh      # Helper CLI to load split synthetic SQL parts into BigQuery
 │   └── run_attribution_transformation.sql # BigQuery SQL attribution transformation pipeline
 └── README.md                       # Documentation & Deployment Guide
 ```
@@ -136,27 +136,26 @@ Once Google Cloud Billing begins delivering records into BigQuery:
    ```bash
    python3 scripts/generate_synthetic_data.py \
      --mode telemetry-only \
-     --project-id YOUR_GCP_PROJECT_ID \
-     --output-sql scripts/synthetic_data_inserts.sql
+     --project-id YOUR_GCP_PROJECT_ID
    ```
 2. Ingest telemetry data into BigQuery:
    ```bash
-   bq query --use_legacy_sql=false < scripts/synthetic_data_inserts.sql
+   ./scripts/load_synthetic_data.sh
    ```
 
 #### Option B: Standalone Demo / Sandbox Simulation (Immediate Testing)
 To test immediately without waiting for live GCP billing export data to arrive:
-1. Generate **both** mock standard billing export records and client telemetry:
+1. Generate **both** mock standard billing export records and client telemetry (automatically split into files under BigQuery's 1024 KB limit):
    ```bash
    python3 scripts/generate_synthetic_data.py \
      --mode all \
      --project-id YOUR_GCP_PROJECT_ID \
-     --billing-account-id YOUR_BILLING_ACCOUNT_ID \
-     --output-sql scripts/synthetic_data_inserts.sql
+     --billing-account-id YOUR_BILLING_ACCOUNT_ID
    ```
+   *(Optional: pass `--execute-bq` to generate and run in one step).*
 2. Execute the generated SQL in BigQuery to create the partitioned billing export table and load all records:
    ```bash
-   bq query --use_legacy_sql=false < scripts/synthetic_data_inserts.sql
+   ./scripts/load_synthetic_data.sh
    ```
 
 ---

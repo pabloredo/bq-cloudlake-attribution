@@ -270,7 +270,7 @@ else
   printf "\n%b🧪 Sandbox / Offline Testing Alternative:%b\n" "${BOLD}" "${NC}"
   printf "To test immediately without waiting for production billing export data, generate mock data:\n"
   printf "  %bpython3 scripts/generate_synthetic_data.py --mode all --project-id %s --billing-account-id %s%b\n" "${BOLD}" "${PROJECT_ID}" "${BILLING_ACCOUNT_ID}" "${NC}"
-  printf "  %bbq query --use_legacy_sql=false < scripts/synthetic_data_inserts.sql%b\n" "${BOLD}" "${NC}"
+  printf "  %b./scripts/load_synthetic_data.sh%b\n" "${BOLD}" "${NC}"
 fi
 
 printf -- "------------------------------------------------------------------------------\n\n"
