@@ -33,6 +33,8 @@ bq-cloudlake-attribution/
 │           ├── main.tf
 │           ├── variables.tf
 │           └── outputs.tf
+├── notebooks/                      # Interactive Data Preparation & Analytics
+│   └── gcs_cost_showback_dataprep.ipynb # BigFrames & BigQuery SQL Notebook
 ├── scripts/                        # Automation & Synthetic Generator
 │   ├── setup_billing_export.sh     # CLI automation to verify/setup GCP Billing Export & BigQuery dataset
 │   ├── generate_synthetic_data.py  # Dual-mode synthetic data generator (auto-splits SQL under 1MB)
@@ -176,11 +178,24 @@ Now that the billing export table (`gcp_billing_export_resource_v1_<BILLING_ACCO
 
 ### Step 5: Run Cost Showback Transformation Pipeline (Batch Table)
 
-To populate the partitioned, clustered table `billing_showback_dataset.showback_cost_attribution` for high-performance reporting dashboards:
+To populate the partitioned, clustered table `billing_showback_dataset.showback_cost_attribution` for high-performance reporting dashboards, you can choose between two methods:
 
+#### Method A: Run Batch SQL Script via CLI
 ```bash
 bq query --use_legacy_sql=false < scripts/run_attribution_transformation.sql
 ```
+
+#### Method B: Run Interactive Jupyter Notebook (`BigFrames` & `%%bqsql`)
+Open and execute the notebook in VS Code, JupyterLab, or Vertex AI Colab Enterprise:
+```bash
+notebooks/gcs_cost_showback_dataprep.ipynb
+```
+* **What it provides**:
+  * Step-by-step data inspection of raw telemetry & billing records.
+  * Interactive attribution formula modeling using BigFrames and `%%bqsql`.
+  * Visual analytics (Top 5 costly applications, department breakdowns, dataset path heatmaps).
+  * Direct table materialization into `billing_showback_dataset.showback_cost_attribution`.
+  * Reconciliation audit queries comparing allocated dollars to billed SKU dollars.
 
 ---
 
