@@ -296,12 +296,12 @@ SELECT
   io.app_ops,
   bt.bucket_total_ops,
   SAFE_DIVIDE(io.app_ops, bt.bucket_total_ops) AS op_ratio,
-  ROUND(
+  CAST(ROUND(
     b.total_sku_cost * CASE
       WHEN b.sku_description LIKE '%Operations%' THEN SAFE_DIVIDE(io.app_ops, bt.bucket_total_ops)
       ELSE SAFE_DIVIDE(io.app_bytes, bt.bucket_total_bytes)
     END, 4
-  ) AS allocated_cost_usd
+  ) AS NUMERIC) AS allocated_cost_usd
 FROM
   hourly_client_io io
 JOIN
