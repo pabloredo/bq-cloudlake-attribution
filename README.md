@@ -54,89 +54,144 @@ bq-cloudlake-attribution/
 
 ---
 
-## 🚀 Deployment & Usage
+## 🚀 Deployment & Usage Workflow
 
-### Step 1: Deploy Infrastructure with Terraform
+```mermaid
+graph TD
+    A["Step 1: Terraform Deploy (create_attribution_view=false)"] --> B["Step 2: Setup Billing Export (setup_billing_export.sh)"]
+    B --> C{"Choose Data Source"}
+    C -->|Option A: Live GCP Billing| D["Generate Telemetry Data (--mode telemetry-only)"]
+    C -->|Option B: Sandbox Simulation| E["Generate Mock Billing & Telemetry (--mode all)"]
+    D --> F["Step 4: Enable Dynamic View (create_attribution_view=true)"]
+    E --> F
+    F --> G["Step 5: Run Batch Showback Pipeline (run_attribution_transformation.sql)"]
+    G --> H["Step 6: Query Analytics & Dashboards"]
+```
 
-1. Create your `terraform.tfvars`:
+---
+
+### Step 1: Deploy Infrastructure with Terraform (`create_attribution_view = false`)
+
+> [!IMPORTANT]
+> BigQuery validates SQL queries **at view creation time**. Because the dynamic view `vw_showback_cost_attribution` references the billing export table (which is created by Google Cloud Billing *after* the dataset is provisioned), **keep `create_attribution_view = false` on your initial deploy**.
+
+1. Copy and configure `terraform.tfvars`:
    ```bash
    cp terraform/terraform.tfvars.example terraform/terraform.tfvars
    ```
-2. Update `gcp_project_id` and `billing_account_id` with your GCP values.
+2. Edit `terraform/terraform.tfvars`:
+   ```hcl
+   gcp_project_id                    = "YOUR_GCP_PROJECT_ID"
+   gcp_region                        = "US" # or us-central1
+   billing_account_id                = "01A2B3-C4D5E6-F78901"
+   billing_dataset_id                = "billing_export_sim"
+   observability_dataset_id          = "observability_dataset"
+   showback_dataset_id               = "showback_dataset"
+   enable_billing_export_dataset_iam = true
+   create_attribution_view           = false # Keep false during initial deployment
+   ```
 3. Initialize and apply Terraform:
    ```bash
    cd terraform
    terraform init
    terraform apply
+   cd ..
    ```
-   *Terraform automatically provisions the BigQuery datasets and configures IAM permissions for the Cloud Billing system service account (`billing-export-bigquery@system.gserviceaccount.com`).*
+   **What this provisions:**
+   - ✅ BigQuery Datasets: `billing_export_sim`, `observability_dataset`, `showback_dataset`.
+   - ✅ Dataset IAM: Grants `roles/bigquery.dataEditor` to `billing-export-bigquery@system.gserviceaccount.com`.
+   - ✅ Telemetry Table: `observability_dataset.client_io_aggregated_events`.
+   - ✅ Persisted Showback Table: `showback_dataset.showback_cost_attribution`.
 
 ---
 
 ### Step 2: Configure & Verify Billing Export
 
-You can use the helper CLI script or follow the Cloud Console direct link:
+Run the helper CLI script to verify prerequisites, test dataset permissions, and get the direct 1-click Google Cloud Console link:
 
-#### Using Google Cloud CLI Helper Script
-Run `scripts/setup_billing_export.sh` to auto-detect your project/billing account, verify dataset IAM bindings, and check if export tables are populated:
 ```bash
 ./scripts/setup_billing_export.sh
 ```
-*To directly open the GCP Billing Export Console in your browser:*
+
+*(Optional) Open the GCP Console directly in your browser:*
 ```bash
 ./scripts/setup_billing_export.sh --open-console
 ```
 
-> **Why a 1-time Console step is required:** Google Cloud does not provide a public API/gcloud command to toggle billing account exports for security and governance reasons. The script provisions datasets, sets IAM permissions, and gives you the exact direct URL:
-> `https://console.cloud.google.com/billing/<BILLING_ACCOUNT_ID>/export/bigquery?project=<PROJECT_ID>`
-> Under **Detailed usage cost**, select your project and dataset (`billing_export_sim`), and click **Save**.
+#### 3-Step Console Handshake:
+1. Open the direct URL output by the script or Terraform:
+   `https://console.cloud.google.com/billing/<BILLING_ACCOUNT_ID>/export/bigquery?project=<PROJECT_ID>`
+2. Under **Detailed usage cost**, click **Edit Settings** (or **Enable Export**).
+3. Select your **Project** and BigQuery dataset (`billing_export_sim`), and click **Save**.
 
 ---
 
-### Step 3: Ingest Telemetry Data (or Run Sandbox Simulation)
+### Step 3: Ingest Telemetry & Billing Data
 
-Depending on your environment, choose **Option A** or **Option B**:
+Choose **Option A** (live GCP environment) or **Option B** (instant sandbox test):
 
 #### Option A: Production Setup with Real GCP Billing Export
 Once Google Cloud Billing begins delivering records into BigQuery:
-1. Generate **telemetry data only** to simulate multi-tenant workloads interacting with your GCS buckets:
+1. Generate **telemetry data only** for multi-tenant workloads:
    ```bash
    python3 scripts/generate_synthetic_data.py \
      --mode telemetry-only \
      --project-id YOUR_GCP_PROJECT_ID \
      --output-sql scripts/synthetic_data_inserts.sql
    ```
-2. Load the telemetry data into BigQuery:
+2. Ingest telemetry data into BigQuery:
    ```bash
    bq query --use_legacy_sql=false < scripts/synthetic_data_inserts.sql
    ```
 
-#### Option B: Standalone Demo / Sandbox Simulation
-If running in a sandbox without an active GCP billing export:
+#### Option B: Standalone Demo / Sandbox Simulation (Immediate Testing)
+To test immediately without waiting for live GCP billing export data to arrive:
 1. Generate **both** mock standard billing export records and client telemetry:
    ```bash
    python3 scripts/generate_synthetic_data.py \
      --mode all \
      --project-id YOUR_GCP_PROJECT_ID \
-     --billing-account-id 01A2B3-C4D5E6-F78901 \
+     --billing-account-id YOUR_BILLING_ACCOUNT_ID \
      --output-sql scripts/synthetic_data_inserts.sql
    ```
-2. Execute the generated SQL in BigQuery to create the partitioned mock billing export table and load all records:
+2. Execute the generated SQL in BigQuery to create the partitioned billing export table and load all records:
    ```bash
    bq query --use_legacy_sql=false < scripts/synthetic_data_inserts.sql
    ```
 
 ---
 
-### Step 4: Run Cost Showback Transformation
+### Step 4: Enable the Dynamic Attribution View (`create_attribution_view = true`)
 
-Execute the attribution transformation script to allocate costs:
+Now that the billing export table (`gcp_billing_export_resource_v1_<BILLING_ACCOUNT_ID>`) exists in BigQuery (from Step 2 or Step 3), enable the dynamic view:
+
+1. Update `create_attribution_view = true` in `terraform/terraform.tfvars` (or pass `-var="create_attribution_view=true"`):
+   ```bash
+   cd terraform
+   terraform apply -var="create_attribution_view=true"
+   cd ..
+   ```
+2. This creates `showback_dataset.vw_showback_cost_attribution` for real-time, on-the-fly showback SQL calculations.
+
+---
+
+### Step 5: Run Cost Showback Transformation Pipeline (Batch Table)
+
+To populate the partitioned, clustered table `showback_dataset.showback_cost_attribution` for high-performance reporting dashboards:
 
 ```bash
 bq query --use_legacy_sql=false < scripts/run_attribution_transformation.sql
 ```
 
-Alternatively, query the dynamic view `showback_dataset.vw_showback_cost_attribution` for real-time calculation.
+---
+
+### Step 6: Verify Table & Export Status
+
+You can re-run the CLI script at any time to verify that the billing export table and GCS SKU records are healthy:
+
+```bash
+./scripts/setup_billing_export.sh --check-only
+```
 
 ---
 
