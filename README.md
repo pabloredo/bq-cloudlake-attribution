@@ -91,6 +91,13 @@ graph TD
    showback_dataset_id               = "billing_showback_dataset"
    enable_billing_export_dataset_iam = true
    create_attribution_view           = false # Keep false during initial deployment
+
+   # Optional: Interactive Notebook & Execution Subnetwork
+   upload_notebook                   = true  # Upload interactive showback notebook to GCS
+   create_notebook_subnet            = true  # Provision dedicated subnetwork for Colab Enterprise runtimes
+   network_name                      = "default" # Or your custom VPC name (e.g. "my-vpc")
+   notebook_subnet_name              = "lakehouse-notebook-subnet"
+   notebook_subnet_cidr              = "10.3.0.0/24"
    ```
 3. Initialize and apply Terraform:
    ```bash
@@ -104,6 +111,8 @@ graph TD
    - ✅ Dataset IAM: Grants `roles/bigquery.dataEditor` to `billing-export-bigquery@system.gserviceaccount.com`.
    - ✅ Telemetry Table: `billing_observability_dataset.client_io_aggregated_events`.
    - ✅ Persisted Showback Table: `billing_showback_dataset.showback_cost_attribution`.
+   - ✅ Notebook Storage Bucket: `<project_id>-lakehouse-notebooks` with uploaded notebook (project variables injected automatically).
+   - ✅ Dedicated Subnetwork: `lakehouse-notebook-subnet` in your target region with Private Google Access enabled for Colab Enterprise runtime compute.
 
 ---
 
@@ -186,11 +195,23 @@ bq query --use_legacy_sql=false < scripts/run_attribution_transformation.sql
 ```
 
 #### Method B: Run Interactive Jupyter Notebook (`BigFrames` & `%%bqsql`)
-Open and execute the notebook in VS Code, JupyterLab, or Vertex AI Colab Enterprise:
-```bash
-notebooks/gcs_cost_showback_dataprep.ipynb
-```
-* **What it provides**:
+
+You can run the interactive notebook either locally or in Google Cloud:
+
+* **Locally in VS Code / JupyterLab**:
+  Open [`notebooks/gcs_cost_showback_dataprep.ipynb`](notebooks/gcs_cost_showback_dataprep.ipynb).
+
+* **In Google Cloud (Colab Enterprise or BigQuery Studio)**:
+  1. Open [Colab Enterprise Console](https://console.cloud.google.com/agent-platform/colab/notebooks) or [BigQuery Studio](https://console.cloud.google.com/bigquery).
+  2. Open the notebook from Cloud Storage using the GCS URI output by Terraform:
+     ```text
+     gs://<PROJECT_ID>-lakehouse-notebooks/notebooks/gcs_cost_showback_dataprep.ipynb
+     ```
+  3. When connecting or configuring the runtime compute, select:
+     * **Network**: Your VPC network (e.g., `pablito-vpc` or `default`)
+     * **Subnetwork**: `lakehouse-notebook-subnet` *(provisioned by Terraform in your region with Private Google Access)*
+
+* **What the notebook provides**:
   * Step-by-step data inspection of raw telemetry & billing records.
   * Interactive attribution formula modeling using BigFrames and `%%bqsql`.
   * Visual analytics (Top 5 costly applications, department breakdowns, dataset path heatmaps).
