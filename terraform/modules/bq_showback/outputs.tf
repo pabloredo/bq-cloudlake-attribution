@@ -43,8 +43,19 @@ output "notebook_gcs_uri" {
   value       = var.upload_notebook ? "gs://${google_storage_bucket.notebooks[0].name}/${google_storage_bucket_object.showback_notebook[0].name}" : ""
 }
 
-output "colab_enterprise_url" {
-  description = "Direct URL to open the notebook in Vertex AI Colab Enterprise"
-  value       = var.upload_notebook ? "https://console.cloud.google.com/vertex-ai/colab/locations/${var.location}/open?uri=gs://${google_storage_bucket.notebooks[0].name}/${google_storage_bucket_object.showback_notebook[0].name}&project=${var.project_id}" : ""
+output "notebook_storage_console_url" {
+  description = "Direct Google Cloud Storage Console link to the uploaded notebook object"
+  value       = var.upload_notebook ? "https://console.cloud.google.com/storage/browser/_details/${google_storage_bucket.notebooks[0].name}/${google_storage_bucket_object.showback_notebook[0].name}?project=${var.project_id}" : ""
 }
+
+output "colab_enterprise_console_url" {
+  description = "Google Cloud Console URL for Vertex AI Colab Enterprise"
+  value       = "https://console.cloud.google.com/colab?project=${var.project_id}"
+}
+
+output "bigquery_studio_console_url" {
+  description = "Google Cloud Console URL for BigQuery Studio"
+  value       = "https://console.cloud.google.com/bigquery?project=${var.project_id}"
+}
+
 

@@ -49,8 +49,19 @@ output "notebook_gcs_uri" {
   value       = module.bq_showback.notebook_gcs_uri
 }
 
-output "colab_enterprise_url" {
-  description = "Direct 1-click link to open the notebook in Vertex AI Colab Enterprise."
-  value       = module.bq_showback.colab_enterprise_url
+output "notebook_storage_console_url" {
+  description = "Direct Google Cloud Storage Console link to the uploaded notebook object."
+  value       = module.bq_showback.notebook_storage_console_url
 }
+
+output "colab_enterprise_console_url" {
+  description = "Google Cloud Console URL for Vertex AI Colab Enterprise."
+  value       = module.bq_showback.colab_enterprise_console_url
+}
+
+output "bigquery_studio_console_url" {
+  description = "Google Cloud Console URL for BigQuery Studio."
+  value       = module.bq_showback.bigquery_studio_console_url
+}
+
 
