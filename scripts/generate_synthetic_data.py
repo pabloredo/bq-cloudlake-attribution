@@ -317,7 +317,7 @@ def main():
     parser.add_argument("--project-id", type=str, default="my-gcp-project-id", help="Target GCP Project ID")
     parser.add_argument("--billing-account-id", type=str, default="01A2B3-C4D5E6-F78901", help="GCP Billing Account ID")
     parser.add_argument("--billing-dataset", type=str, default="billing_export_sim", help="Billing export dataset ID")
-    parser.add_argument("--obs-dataset", type=str, default="observability_dataset", help="Observability dataset ID")
+    parser.add_argument("--obs-dataset", type=str, default="billing_observability_dataset", help="Observability dataset ID")
     parser.add_argument("--mode", choices=["all", "telemetry-only", "billing-only"], default="all", help="Data generation mode: 'telemetry-only' (for live GCP billing export), 'all' (sandbox), 'billing-only'")
     parser.add_argument("--output-sql", type=str, default="scripts/synthetic_data_inserts.sql", help="File path to save output SQL script")
     parser.add_argument("--load-bq", action="store_true", help="Directly load data into BigQuery using python client")

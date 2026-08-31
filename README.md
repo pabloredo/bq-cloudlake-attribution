@@ -14,8 +14,8 @@ Following Google Cloud best practices, the Cloud Billing service automatically c
 * **Table & Schema**: Managed automatically by Google Cloud Billing upon enabling export in the Cloud Billing Console. Schema evolution (e.g. new SKU metadata, `cost_at_list`, `tags`) is handled by Google without manual schema drift.
 
 ### 2. Custom Observability & Showback (User-Managed)
-* **Observability Dataset & Table** (`observability_dataset.client_io_aggregated_events`): Hourly reduced GCS I/O telemetry emitted by filesystem stream clients.
-* **Showback Dataset & Attribution View/Table** (`showback_dataset.showback_cost_attribution` & `vw_showback_cost_attribution`): Joins bucket SKU hourly totals with client-side byte/operation ratios to allocate exact SKU dollars per workload and dataset path.
+* **Observability Dataset & Table** (`billing_observability_dataset.client_io_aggregated_events`): Hourly reduced GCS I/O telemetry emitted by filesystem stream clients.
+* **Showback Dataset & Attribution View/Table** (`billing_showback_dataset.showback_cost_attribution` & `vw_showback_cost_attribution`): Joins bucket SKU hourly totals with client-side byte/operation ratios to allocate exact SKU dollars per workload and dataset path.
 
 ---
 
@@ -48,9 +48,9 @@ bq-cloudlake-attribution/
 | Dataset ID | Table / View ID | Type | Managed By | Description |
 | :--- | :--- | :--- | :--- | :--- |
 | `billing_export_sim` | `gcp_billing_export_resource_v1_<ACCOUNT_ID>` | Table | Google Cloud Billing / Mock | Standard Detailed Billing Export containing resource-level GCS SKUs. |
-| `observability_dataset` | `client_io_aggregated_events` | Table | Terraform & Telemetry Stream | Hourly reduced GCS I/O telemetry (Spark, Presto, Ray, Hive). |
-| `showback_dataset` | `showback_cost_attribution` | Table | Terraform & Pipeline | Persisted showback table allocating costs per `application_id`, user, and dataset path. |
-| `showback_dataset` | `vw_showback_cost_attribution` | View | Terraform | Dynamic view computing showback attribution on-the-fly. |
+| `billing_observability_dataset` | `client_io_aggregated_events` | Table | Terraform & Telemetry Stream | Hourly reduced GCS I/O telemetry (Spark, Presto, Ray, Hive). |
+| `billing_showback_dataset` | `showback_cost_attribution` | Table | Terraform & Pipeline | Persisted showback table allocating costs per `application_id`, user, and dataset path. |
+| `billing_showback_dataset` | `vw_showback_cost_attribution` | View | Terraform | Dynamic view computing showback attribution on-the-fly. |
 
 ---
 
@@ -85,8 +85,8 @@ graph TD
    gcp_region                        = "US" # or us-central1
    billing_account_id                = "01A2B3-C4D5E6-F78901"
    billing_dataset_id                = "billing_export_sim"
-   observability_dataset_id          = "observability_dataset"
-   showback_dataset_id               = "showback_dataset"
+   observability_dataset_id          = "billing_observability_dataset"
+   showback_dataset_id               = "billing_showback_dataset"
    enable_billing_export_dataset_iam = true
    create_attribution_view           = false # Keep false during initial deployment
    ```
@@ -98,10 +98,10 @@ graph TD
    cd ..
    ```
    **What this provisions:**
-   - ✅ BigQuery Datasets: `billing_export_sim`, `observability_dataset`, `showback_dataset`.
+   - ✅ BigQuery Datasets: `billing_export_sim`, `billing_observability_dataset`, `billing_showback_dataset`.
    - ✅ Dataset IAM: Grants `roles/bigquery.dataEditor` to `billing-export-bigquery@system.gserviceaccount.com`.
-   - ✅ Telemetry Table: `observability_dataset.client_io_aggregated_events`.
-   - ✅ Persisted Showback Table: `showback_dataset.showback_cost_attribution`.
+   - ✅ Telemetry Table: `billing_observability_dataset.client_io_aggregated_events`.
+   - ✅ Persisted Showback Table: `billing_showback_dataset.showback_cost_attribution`.
 
 ---
 
@@ -171,13 +171,13 @@ Now that the billing export table (`gcp_billing_export_resource_v1_<BILLING_ACCO
    terraform apply -var="create_attribution_view=true"
    cd ..
    ```
-2. This creates `showback_dataset.vw_showback_cost_attribution` for real-time, on-the-fly showback SQL calculations.
+2. This creates `billing_showback_dataset.vw_showback_cost_attribution` for real-time, on-the-fly showback SQL calculations.
 
 ---
 
 ### Step 5: Run Cost Showback Transformation Pipeline (Batch Table)
 
-To populate the partitioned, clustered table `showback_dataset.showback_cost_attribution` for high-performance reporting dashboards:
+To populate the partitioned, clustered table `billing_showback_dataset.showback_cost_attribution` for high-performance reporting dashboards:
 
 ```bash
 bq query --use_legacy_sql=false < scripts/run_attribution_transformation.sql
@@ -206,7 +206,7 @@ SELECT
   SUM(allocated_cost_usd) AS total_allocated_cost_usd,
   ROUND(SUM(app_bytes) / 1e9, 2) AS total_gb_transferred
 FROM
-  `showback_dataset.showback_cost_attribution`
+  `billing_showback_dataset.showback_cost_attribution`
 GROUP BY
   1, 2, 3
 ORDER BY
@@ -222,7 +222,7 @@ SELECT
   sku_description,
   SUM(allocated_cost_usd) AS cost_usd
 FROM
-  `showback_dataset.showback_cost_attribution`
+  `billing_showback_dataset.showback_cost_attribution`
 GROUP BY
   1, 2, 3
 ORDER BY

@@ -9,7 +9,7 @@
 -- If using non-default dataset IDs or billing accounts, adjust table names below:
 -- Billing table format: `<project_id>.<billing_dataset>.gcp_billing_export_resource_v1_<BILLING_ACCOUNT_ID_WITH_UNDERSCORES>`
 
-INSERT INTO `showback_dataset.showback_cost_attribution` (
+INSERT INTO `billing_showback_dataset.showback_cost_attribution` (
   usage_timestamp,
   application_id,
   engine,
@@ -54,7 +54,7 @@ hourly_client_io AS (
     SUM(bytes_transferred) AS app_bytes,
     SUM(operation_count) AS app_ops
   FROM
-    `observability_dataset.client_io_aggregated_events`
+    `billing_observability_dataset.client_io_aggregated_events`
   GROUP BY
     1, 2, 3, 4, 5, 6
 ),

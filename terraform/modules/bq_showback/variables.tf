@@ -18,16 +18,19 @@ variable "billing_account_id" {
 variable "billing_dataset_id" {
   description = "Dataset ID for GCP Detailed Billing Export (where Cloud Billing exports data or mock export is placed)"
   type        = string
+  default     = "billing_export_sim"
 }
 
 variable "observability_dataset_id" {
   description = "Dataset ID for client-side GCS I/O telemetry"
   type        = string
+  default     = "billing_observability_dataset"
 }
 
 variable "showback_dataset_id" {
   description = "Dataset ID for final cost showback attribution"
   type        = string
+  default     = "billing_showback_dataset"
 }
 
 variable "enable_billing_export_dataset_iam" {

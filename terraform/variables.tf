@@ -25,13 +25,13 @@ variable "billing_dataset_id" {
 variable "observability_dataset_id" {
   description = "Dataset ID for client-side aggregated GCS I/O telemetry."
   type        = string
-  default     = "observability_dataset"
+  default     = "billing_observability_dataset"
 }
 
 variable "showback_dataset_id" {
   description = "Dataset ID for final cost showback attribution tables and views."
   type        = string
-  default     = "showback_dataset"
+  default     = "billing_showback_dataset"
 }
 
 variable "enable_billing_export_dataset_iam" {

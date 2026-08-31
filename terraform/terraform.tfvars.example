@@ -1,9 +1,9 @@
 gcp_project_id          = "your-gcp-project-id"
 gcp_region              = "US"
 billing_account_id      = "01A2B3-C4D5E6-F78901"
-billing_dataset_id       = "billing_export_sim"
-observability_dataset_id = "observability_dataset"
-showback_dataset_id              = "showback_dataset"
+billing_dataset_id                = "billing_export_sim"
+observability_dataset_id          = "billing_observability_dataset"
+showback_dataset_id               = "billing_showback_dataset"
 enable_billing_export_dataset_iam = true
 create_attribution_view           = false # Set to true once billing export table exists in BigQuery
 
