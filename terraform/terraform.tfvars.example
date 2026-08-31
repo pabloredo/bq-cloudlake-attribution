@@ -5,4 +5,5 @@ billing_dataset_id       = "billing_export_sim"
 observability_dataset_id = "observability_dataset"
 showback_dataset_id              = "showback_dataset"
 enable_billing_export_dataset_iam = true
+create_attribution_view           = false # Set to true once billing export table exists in BigQuery
 

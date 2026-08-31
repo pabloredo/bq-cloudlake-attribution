@@ -36,3 +36,9 @@ variable "enable_billing_export_dataset_iam" {
   default     = true
 }
 
+variable "create_attribution_view" {
+  description = "Whether to create the dynamic showback view (vw_showback_cost_attribution). Set to true once the billing export table exists in BigQuery."
+  type        = bool
+  default     = false
+}
+

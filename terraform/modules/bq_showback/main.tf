@@ -224,7 +224,10 @@ EOF
 }
 
 # 4. Cost Showback View for Dynamic On-the-Fly Querying
+# Note: BigQuery validates the query at creation time. This requires the billing export table
+# to exist first (via Cloud Billing export or synthetic data). Enabled via create_attribution_view.
 resource "google_bigquery_table" "vw_showback_cost_attribution" {
+  count               = var.create_attribution_view ? 1 : 0
   project             = var.project_id
   dataset_id          = google_bigquery_dataset.showback.dataset_id
   table_id            = "vw_showback_cost_attribution"

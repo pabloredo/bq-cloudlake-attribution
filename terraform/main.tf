@@ -22,5 +22,6 @@ module "bq_showback" {
   observability_dataset_id          = var.observability_dataset_id
   showback_dataset_id               = var.showback_dataset_id
   enable_billing_export_dataset_iam = var.enable_billing_export_dataset_iam
+  create_attribution_view           = var.create_attribution_view
 }
 
