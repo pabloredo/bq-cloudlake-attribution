@@ -6,4 +6,7 @@ observability_dataset_id          = "billing_observability_dataset"
 showback_dataset_id               = "billing_showback_dataset"
 enable_billing_export_dataset_iam = true
 create_attribution_view           = false # Set to true once billing export table exists in BigQuery
+upload_notebook                   = true  # Upload interactive notebook to GCS for Colab Enterprise
+notebooks_bucket_name             = ""     # Optional custom bucket name (defaults to <project_id>-lakehouse-notebooks)
+
 

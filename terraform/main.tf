@@ -23,5 +23,8 @@ module "bq_showback" {
   showback_dataset_id               = var.showback_dataset_id
   enable_billing_export_dataset_iam = var.enable_billing_export_dataset_iam
   create_attribution_view           = var.create_attribution_view
+  upload_notebook                   = var.upload_notebook
+  notebooks_bucket_name             = var.notebooks_bucket_name
+  notebook_file_path                = "${path.module}/../notebooks/gcs_cost_showback_dataprep.ipynb"
 }
 

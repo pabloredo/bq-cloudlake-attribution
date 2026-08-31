@@ -314,3 +314,36 @@ EOF
     use_legacy_sql = false
   }
 }
+
+# ------------------------------------------------------------------------------
+# 5. Interactive Notebook GCS Bucket & Object
+# ------------------------------------------------------------------------------
+
+locals {
+  notebook_bucket_name = var.notebooks_bucket_name != "" ? var.notebooks_bucket_name : "${var.project_id}-lakehouse-notebooks"
+  notebook_source_path = var.notebook_file_path != "" ? var.notebook_file_path : "${path.module}/../../../notebooks/gcs_cost_showback_dataprep.ipynb"
+}
+
+resource "google_storage_bucket" "notebooks" {
+  count                       = var.upload_notebook ? 1 : 0
+  name                        = local.notebook_bucket_name
+  project                     = var.project_id
+  location                    = var.location
+  uniform_bucket_level_access = true
+  force_destroy               = true
+}
+
+resource "google_storage_bucket_object" "showback_notebook" {
+  count        = var.upload_notebook ? 1 : 0
+  name         = "notebooks/gcs_cost_showback_dataprep.ipynb"
+  bucket       = google_storage_bucket.notebooks[0].name
+  content      = replace(
+    replace(
+      file(local.notebook_source_path),
+      "YOUR_PROJECT_ID", var.project_id
+    ),
+    "01A2B3-C4D5E6-F78901", var.billing_account_id
+  )
+  content_type = "application/x-ipynb+json"
+}
+

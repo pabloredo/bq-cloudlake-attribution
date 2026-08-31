@@ -46,3 +46,16 @@ variable "create_attribution_view" {
   default     = false
 }
 
+variable "upload_notebook" {
+  description = "Whether to upload the interactive data preparation notebook to Google Cloud Storage."
+  type        = bool
+  default     = true
+}
+
+variable "notebooks_bucket_name" {
+  description = "Custom GCS bucket name for notebooks (defaults to <project_id>-lakehouse-notebooks if empty)."
+  type        = string
+  default     = ""
+}
+
+

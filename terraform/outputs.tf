@@ -38,3 +38,19 @@ output "billing_export_console_url" {
   description = "Direct Google Cloud Console URL to enable/configure Billing Export to BigQuery."
   value       = module.bq_showback.billing_export_console_url
 }
+
+output "notebooks_bucket_name" {
+  description = "Name of the GCS bucket storing notebooks."
+  value       = module.bq_showback.notebooks_bucket_name
+}
+
+output "notebook_gcs_uri" {
+  description = "GCS URI of the uploaded interactive data preparation notebook."
+  value       = module.bq_showback.notebook_gcs_uri
+}
+
+output "colab_enterprise_url" {
+  description = "Direct 1-click link to open the notebook in Vertex AI Colab Enterprise."
+  value       = module.bq_showback.colab_enterprise_url
+}
+
