@@ -124,3 +124,9 @@ Thumbs.db:encryptable
 ehthumbs.db
 ehthumbs_vista.db
 [Dd]esktop.ini
+
+# ==============================================================================
+# Generated Synthetic Data & SQL Inserts (May contain user project IDs)
+# ==============================================================================
+scripts/synthetic_data_inserts.sql
+*synthetic_data_inserts*.sql
