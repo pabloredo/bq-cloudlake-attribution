@@ -50,7 +50,7 @@ output "notebook_storage_console_url" {
 
 output "colab_enterprise_console_url" {
   description = "Google Cloud Console URL for Vertex AI Colab Enterprise"
-  value       = "https://console.cloud.google.com/colab?project=${var.project_id}"
+  value       = "https://console.cloud.google.com/agent-platform/colab/notebooks?project=${var.project_id}"
 }
 
 output "bigquery_studio_console_url" {
