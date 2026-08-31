@@ -26,5 +26,9 @@ module "bq_showback" {
   upload_notebook                   = var.upload_notebook
   notebooks_bucket_name             = var.notebooks_bucket_name
   notebook_file_path                = "${path.module}/../notebooks/gcs_cost_showback_dataprep.ipynb"
+  create_notebook_subnet            = var.create_notebook_subnet
+  network_name                      = var.network_name
+  notebook_subnet_name              = var.notebook_subnet_name
+  notebook_subnet_cidr              = var.notebook_subnet_cidr
 }
 

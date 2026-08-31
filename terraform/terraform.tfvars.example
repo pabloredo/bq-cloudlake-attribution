@@ -8,5 +8,10 @@ enable_billing_export_dataset_iam = true
 create_attribution_view           = false # Set to true once billing export table exists in BigQuery
 upload_notebook                   = true  # Upload interactive notebook to GCS for Colab Enterprise
 notebooks_bucket_name             = ""     # Optional custom bucket name (defaults to <project_id>-lakehouse-notebooks)
+create_notebook_subnet            = true  # Create dedicated subnetwork for Colab Enterprise runtime
+network_name                      = "default" # Or custom VPC network name (e.g. "my-vpc")
+notebook_subnet_name              = "lakehouse-notebook-subnet"
+notebook_subnet_cidr              = "10.3.0.0/24"
+
 
 

@@ -64,4 +64,15 @@ output "bigquery_studio_console_url" {
   value       = module.bq_showback.bigquery_studio_console_url
 }
 
+output "notebook_subnet_name" {
+  description = "Name of the dedicated subnetwork created for notebook execution."
+  value       = module.bq_showback.notebook_subnet_name
+}
+
+output "notebook_subnet_id" {
+  description = "ID of the dedicated subnetwork created for notebook execution."
+  value       = module.bq_showback.notebook_subnet_id
+}
+
+
 

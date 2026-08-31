@@ -63,3 +63,28 @@ variable "notebook_file_path" {
   default     = ""
 }
 
+variable "create_notebook_subnet" {
+  description = "Whether to create a dedicated subnetwork for notebooks in the target region"
+  type        = bool
+  default     = true
+}
+
+variable "network_name" {
+  description = "VPC network name to attach the subnetwork to (e.g. pablito-vpc or default)"
+  type        = string
+  default     = "default"
+}
+
+variable "notebook_subnet_name" {
+  description = "Name of the subnetwork for notebook runtimes"
+  type        = string
+  default     = "lakehouse-notebook-subnet"
+}
+
+variable "notebook_subnet_cidr" {
+  description = "CIDR range for the notebook subnetwork"
+  type        = string
+  default     = "10.3.0.0/24"
+}
+
+

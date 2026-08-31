@@ -347,3 +347,19 @@ resource "google_storage_bucket_object" "showback_notebook" {
   content_type = "application/x-ipynb+json"
 }
 
+# ------------------------------------------------------------------------------
+# 6. Notebook Subnetwork for Colab Enterprise / Vertex AI Runtimes
+# ------------------------------------------------------------------------------
+
+resource "google_compute_subnetwork" "notebook_subnet" {
+  count                    = var.create_notebook_subnet ? 1 : 0
+  name                     = var.notebook_subnet_name
+  ip_cidr_range            = var.notebook_subnet_cidr
+  region                   = var.location
+  network                  = var.network_name
+  project                  = var.project_id
+  private_ip_google_access = true
+  description              = "Dedicated subnetwork for Colab Enterprise and Vertex AI notebook execution in ${var.location}"
+}
+
+

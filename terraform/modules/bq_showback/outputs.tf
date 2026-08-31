@@ -58,4 +58,15 @@ output "bigquery_studio_console_url" {
   value       = "https://console.cloud.google.com/bigquery?project=${var.project_id}"
 }
 
+output "notebook_subnet_id" {
+  description = "ID of the subnetwork for notebook runtimes"
+  value       = var.create_notebook_subnet ? google_compute_subnetwork.notebook_subnet[0].id : ""
+}
+
+output "notebook_subnet_name" {
+  description = "Name of the subnetwork for notebook runtimes"
+  value       = var.create_notebook_subnet ? google_compute_subnetwork.notebook_subnet[0].name : ""
+}
+
+
 
